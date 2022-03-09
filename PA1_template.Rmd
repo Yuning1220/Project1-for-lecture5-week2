@@ -1,0 +1,116 @@
+---
+title: "Project1 for lecture5 week2"
+output: html_notebook
+---
+
+Download the dataset from the given link.
+```{r, echo=TRUE}
+filename<-"Coursera_DS5_week2.zip"
+
+if (!file.exists(filename)){
+  url <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip"
+  download.file(url, filename, method="curl")
+}
+unzip(filename)
+Activity <- read.csv("activity.csv")
+activity<-Activity[complete.cases(Activity),]
+
+```
+
+### Quesion1
+
+For the first question, calculate the total number of steps taken per day and plot a histagram for the results.
+Next, calculate and report the mean and median of the total number of steps taken per day.
+
+```{r, echo=TRUE}
+steps_bydate <- aggregate(activity$steps ~ activity$date, activity, sum)
+
+hist(steps_bydate[, 2], xlab = "Steps", main="Total number of steps taken each day")
+
+mean<-mean(steps_bydate[, 2])
+median<-median(steps_bydate[, 2])
+
+sprintf('The mean and median of the total number of steps taken each day is %f and %f.', mean, median)
+```
+
+### Quesion2
+
+For the second question, calculate the average steps for each interval and plot the results.
+Next, report the interval with maxima average steps, which is the "835".
+
+```{r, echo=TRUE}
+mean_byinterval <- tapply(activity$steps, as.factor(activity$interval), mean)
+plot(names(mean_byinterval), mean_byinterval, type='l', xlab = "Interval", ylab = "Mean steps",
+     main = "Mean steps by interval")
+interval_max<-names(mean_byinterval[mean_byinterval == max(mean_byinterval)])
+
+sprintf('The interval with maximal average steps is %s.', interval_max)
+```
+
+### Quesion3 
+
+Firstly I calculated the number of NA values in the original dataset.
+```{r, echo=TRUE}
+rowwithNA<-length(complete.cases(activity)==FALSE)
+sprintf("The number of rows with NA value is %d.", rowwithNA)
+```
+
+Next, I replaced the NA values in the original dataset with the corresponding average steps for interval.
+
+```{r, echo=TRUE}
+mean_byinterval_1<-as.data.frame(mean_byinterval)
+Activity_nona<-Activity
+for (i in 1:dim(Activity)[1]){
+  if ( is.na(Activity$steps[i]) ) {
+    index <- Activity$interval[i]
+    Activity_nona$steps[i] <- mean_byinterval_1[rownames(mean_byinterval_1)==index, ]
+  }
+}
+```
+
+Finally, I used the new dataset(without NA values) to calculate the same items in question2, and then checked the difference between them.
+
+```{r, echo=TRUE}
+steps_nona_byday <- aggregate(steps~date, Activity_nona, sum)
+hist(steps_nona_byday[,2], xlab = "Steps", main = "Total number of steps taken each day for non-NA dataset")
+mean_nona <- mean( steps_nona_byday[, 2] )
+median_nona <- median( steps_nona_byday[, 2] )
+sprintf('The mean and median of the total number of steps taken each day for non-NA dataset is %f and %f.', mean_nona, median_nona)
+(1-mean/mean_nona)
+(1-median/median_nona)
+```
+
+The mean didn’t change after the replacements of NAs, the median changed about 0.1% of the original value.
+
+### Question4
+
+Make a panel plot containing a time series plot (i.e. 𝚝𝚢𝚙𝚎 = “𝚕”) of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis). 
+
+```{r, echo=TRUE}
+Activity_week <- Activity_nona
+Activity_week$date <- as.Date(Activity_week$dat)
+Activity_week$date <- weekdays(Activity_week$date)
+
+days<-unique(Activity_week$date)
+
+for (i in days) {
+  if (i=="星期六" | i=="星期日"){
+    Activity_week[ Activity_week==i ] <- "weekend"
+  }else{
+    Activity_week[ Activity_week==i ] <- "weekday"
+  }
+}
+
+f <- as.factor(Activity_week$date)
+Activity_week_1 <- split(Activity_week, f)
+
+weekday <- as.data.frame(Activity_week_1[1])
+weekend <- as.data.frame(Activity_week_1[2])
+
+weekday_mean <- tapply(weekday$weekday.steps, as.factor(weekday$weekday.interval), mean)
+weekend_mean <- tapply(weekend$weekend.steps, as.factor(weekend$weekend.interval), mean)
+
+par(mfrow=c(1,2)) 
+plot(names(weekday_mean), weekday_mean, type = "l", xlab = "Interval", ylab = "Average steps", main = "Weekday")
+plot(names(weekend_mean), weekend_mean, type = "l", xlab = "Interval", ylab = "Average steps", main = "Weekend")
+```
